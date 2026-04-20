@@ -317,6 +317,9 @@ cards:
             styles:
               card:
                 - background-color: white
+  - type: heading
+    heading: Система
+    heading_style: subtitle
   - type: grid
     columns: 4
     square: false
