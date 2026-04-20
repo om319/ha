@@ -1,30 +1,340 @@
 type: grid
+columns: 1
 cards:
-  - type: heading
-    heading: MPPT Solar Controller (5 min refresh)
-    heading_style: title
+  - type: custom:button-card
+    name: ⚡ MPPT Solar Controller
+    styles:
+      card:
+        - background-color: '#ff6f00'
+        - color: white
+        - font-size: 18px
+        - font-weight: bold
+        - padding: 12px
+        - border-radius: 12px
+      name:
+        - color: white
+    tap_action:
+      action: none
+
+  # STATUS OVERVIEW
+  - type: horizontal-stack
+    cards:
+      - type: custom:button-card
+        entity: sensor.mppt_solar_controller_charging_status
+        name: Charging Status
+        show_state: true
+        icon: mdi:battery-charging
+        styles:
+          card:
+            - padding: 12px
+            - border-radius: 10px
+            - background-color: |
+                [[[
+                  if (entity.state === 'Charging') return '#4caf50';
+                  if (entity.state === 'Standby') return '#2196f3';
+                  return '#607d8b';
+                ]]]
+          name:
+            - font-size: 11px
+            - color: white
+          state:
+            - font-size: 13px
+            - font-weight: bold
+            - color: white
+          icon:
+            - color: white
+            - width: 30px
+        tap_action:
+          action: more-info
+
+      - type: custom:button-card
+        entity: sensor.mppt_solar_controller_energy_generated_today
+        name: Energy Today
+        show_state: true
+        icon: mdi:solar-power
+        styles:
+          card:
+            - padding: 12px
+            - border-radius: 10px
+            - background-color: '#ff9800'
+          name:
+            - font-size: 11px
+            - color: white
+          state:
+            - font-size: 16px
+            - font-weight: bold
+            - color: white
+          icon:
+            - color: white
+            - width: 30px
+        tap_action:
+          action: more-info
+
+  # POWER & VOLTAGE CARDS
+  - type: horizontal-stack
+    cards:
+      - type: custom:button-card
+        entity: sensor.mppt_solar_controller_charging_power
+        name: Charging Power
+        show_state: true
+        show_label: true
+        icon: mdi:lightning-bolt
+        label: |
+          [[[
+            var current = parseFloat(states['sensor.mppt_solar_controller_charging_current'].state);
+            return `Current: ${current}A`;
+          ]]]
+        styles:
+          card:
+            - padding: 15px
+            - border-radius: 12px
+            - background-color: |
+                [[[
+                  var power = parseFloat(entity.state);
+                  if (power > 100) return '#4caf50';
+                  if (power > 50) return '#8bc34a';
+                  if (power > 10) return '#ffc107';
+                  return '#607d8b';
+                ]]]
+          name:
+            - font-size: 11px
+            - color: white
+            - font-weight: bold
+          state:
+            - font-size: 24px
+            - font-weight: bold
+            - color: white
+          label:
+            - font-size: 9px
+            - color: rgba(255,255,255,0.8)
+            - margin-top: 2px
+          icon:
+            - color: white
+            - width: 35px
+        tap_action:
+          action: more-info
+
+      - type: custom:button-card
+        entity: sensor.mppt_solar_controller_pv_voltage
+        name: Solar Panel
+        show_state: true
+        show_label: true
+        icon: mdi:solar-panel-large
+        label: Voltage
+        styles:
+          card:
+            - padding: 15px
+            - border-radius: 12px
+            - background-color: '#ff6f00'
+          name:
+            - font-size: 11px
+            - color: white
+            - font-weight: bold
+          state:
+            - font-size: 24px
+            - font-weight: bold
+            - color: white
+          label:
+            - font-size: 9px
+            - color: rgba(255,255,255,0.8)
+            - margin-top: 2px
+          icon:
+            - color: white
+            - width: 35px
+        tap_action:
+          action: more-info
+
+      - type: custom:button-card
+        entity: sensor.mppt_solar_controller_battery_voltage
+        name: Battery
+        show_state: true
+        show_label: true
+        icon: mdi:battery
+        label: |
+          [[[
+            var soc = parseFloat(states['sensor.mppt_solar_controller_battery_state_of_charge'].state);
+            return `SOC: ${soc}%`;
+          ]]]
+        styles:
+          card:
+            - padding: 15px
+            - border-radius: 12px
+            - background-color: |
+                [[[
+                  var soc = parseFloat(states['sensor.mppt_solar_controller_battery_state_of_charge'].state);
+                  if (soc > 80) return '#4caf50';
+                  if (soc > 50) return '#8bc34a';
+                  if (soc > 20) return '#ffc107';
+                  return '#f44336';
+                ]]]
+          name:
+            - font-size: 11px
+            - color: white
+            - font-weight: bold
+          state:
+            - font-size: 24px
+            - font-weight: bold
+            - color: white
+          label:
+            - font-size: 9px
+            - color: rgba(255,255,255,0.8)
+            - margin-top: 2px
+          icon:
+            - color: white
+            - width: 35px
+        tap_action:
+          action: more-info
+
+  # LOAD OUTPUT
+  - type: horizontal-stack
+    cards:
+      - type: custom:button-card
+        entity: sensor.mppt_solar_controller_load_status
+        name: Load Output
+        show_state: true
+        icon: mdi:power-plug
+        styles:
+          card:
+            - padding: 12px
+            - border-radius: 10px
+            - background-color: |
+                [[[
+                  if (entity.state === 'on' || entity.state === 'On') return '#4caf50';
+                  return '#607d8b';
+                ]]]
+          name:
+            - font-size: 11px
+            - color: white
+          state:
+            - font-size: 16px
+            - font-weight: bold
+            - color: white
+          icon:
+            - color: white
+            - width: 30px
+        tap_action:
+          action: more-info
+
+      - type: custom:button-card
+        entity: sensor.mppt_solar_controller_load_power
+        name: Load Power (Cameras)
+        show_state: true
+        icon: mdi:cctv
+        styles:
+          card:
+            - padding: 12px
+            - border-radius: 10px
+            - background-color: '#9c27b0'
+          name:
+            - font-size: 11px
+            - color: white
+          state:
+            - font-size: 16px
+            - font-weight: bold
+            - color: white
+          icon:
+            - color: white
+            - width: 30px
+        tap_action:
+          action: more-info
+
+  # DETAILED INFO
   - type: entities
+    title: 📊 Detailed Information
+    show_header_toggle: false
+    card_mod:
+      style: |
+        ha-card {
+          border-radius: 12px;
+        }
     entities:
       - entity: sensor.mppt_solar_controller_pv_voltage
         name: Solar Panel Voltage
+        icon: mdi:flash
+      - entity: sensor.mppt_solar_controller_charging_current
+        name: Charging Current
+        icon: mdi:current-dc
       - entity: sensor.mppt_solar_controller_charging_power
         name: Charging Power
+        icon: mdi:lightning-bolt
+      - type: divider
       - entity: sensor.mppt_solar_controller_battery_voltage
         name: Battery Voltage
+        icon: mdi:battery-charging
       - entity: sensor.mppt_solar_controller_battery_state_of_charge
         name: Battery SOC
-      - entity: sensor.mppt_solar_controller_energy_generated_today
-        name: Energy Today
+        icon: mdi:battery-70
+      - type: divider
       - entity: sensor.mppt_solar_controller_load_status
-        name: Load Output
+        name: Load Output Status
+        icon: mdi:power-plug
+      - entity: sensor.mppt_solar_controller_load_power
+        name: Load Power (Cameras)
+        icon: mdi:cctv
+      - type: divider
+      - entity: sensor.mppt_solar_controller_controller_temperature
+        name: Controller Temperature
+        icon: mdi:thermometer
+      - entity: sensor.mppt_solar_controller_energy_generated_today
+        name: Energy Generated Today
+        icon: mdi:solar-power
+
+  # REFRESH BUTTON
+  - type: horizontal-stack
+    cards:
+      - type: custom:button-card
+        entity: button.mppt_solar_controller_refresh
+        name: Refresh MPPT Data
+        icon: mdi:refresh
+        tap_action:
+          action: call-service
+          service: button.press
+          service_data:
+            entity_id: button.mppt_solar_controller_refresh
+        styles:
+          card:
+            - padding: 12px
+            - border-radius: 10px
+            - background-color: '#2196f3'
+            - "--mdc-ripple-color": white
+            - "--mdc-ripple-press-opacity": 0.5
+          name:
+            - font-size: 12px
+            - color: white
+            - font-weight: bold
+          icon:
+            - color: white
+            - width: 30px
+
+  # POWER HISTORY
+  - type: history-graph
+    title: 📈 Power History (24h)
+    hours_to_show: 24
+    refresh_interval: 60
+    entities:
+      - entity: sensor.mppt_solar_controller_charging_power
+        name: Charging Power
       - entity: sensor.mppt_solar_controller_load_power
         name: Load Power
-      - entity: sensor.mppt_solar_controller_controller_temperature
-        name: Controller Temp
-      - entity: sensor.mppt_solar_controller_charging_status
-        name: Charging status
-      - entity: button.mppt_solar_controller_refresh
-        name: Refresh Now
-    cards:
-      - type: heading
-        heading: Solar Controller
+
+  # INFO
+  - type: markdown
+    card_mod:
+      style: |
+        ha-card {
+          border-radius: 12px;
+        }
+    content: >
+      ## ⚡ MPPT Controller Info
+
+      **Update Interval:** 5 minutes (automatic BLE refresh)
+
+      **Solar Panels:** 2×450W connected to PV input
+
+      **Load Output:** Powers security cameras directly from battery
+
+      **Manual Refresh:** Use button above to force immediate update
+
+      ---
+
+      💡 **Tip:** Controller temperature should stay below 45°C for optimal performance
