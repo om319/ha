@@ -227,7 +227,7 @@ cards:
             - width: 28px
             - color: black
       - type: custom:button-card
-        entity: select.sonoff_ab300012ee_4
+        entity: switch.sonoff_ab300012ee_4
         name: Насос
         icon: mdi:water-pump
         show_label: true
