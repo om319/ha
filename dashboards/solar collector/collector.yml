@@ -1,0 +1,245 @@
+type: grid
+cards:
+  - type: heading
+    heading: ☀️ Solar Collector Controller
+  - type: entities
+    title: 🎛️ System Control
+    show_header_toggle: false
+    state_color: true
+    entities:
+      - entity: sensor.solar_system_status
+        name: Status
+        icon: mdi:information-outline
+      - entity: input_boolean.solar_system_enabled
+        name: System Enabled
+      - entity: input_boolean.solar_manual_control
+        name: Manual Control
+      - entity: input_boolean.solar_collector_summer_mode
+        name: Summer Mode
+      - entity: switch.solar_collector_wifi_solar_pump
+        name: Solar Pump
+      - type: divider
+      - entity: counter.solar_pump_on_counter
+        name: Cycles Today
+        icon: mdi:counter
+      - entity: input_datetime.solar_last_switch_time
+        name: Last Switch
+  - type: conditional
+    conditions:
+      - entity: input_boolean.solar_collector_summer_mode
+        state: "on"
+    card:
+      type: grid
+      columns: 3
+      square: false
+      cards:
+        - type: gauge
+          entity: sensor.solar_collector_temp_clean
+          name: Collector
+          min: 0
+          max: 120
+          severity:
+            green: 30
+            yellow: 55
+            red: 80
+        - type: gauge
+          entity: sensor.solar_collector_wifi_boiler_temperature
+          name: Boiler (Summer)
+          min: 0
+          max: 100
+          severity:
+            green: 30
+            yellow: 55
+            red: 80
+        - type: gauge
+          entity: sensor.solar_collector_delta_temperature
+          name: ΔT
+          min: -10
+          max: 40
+          severity:
+            green: 5
+            yellow: 10
+            red: 15
+  - type: conditional
+    conditions:
+      - entity: input_boolean.solar_collector_summer_mode
+        state: "off"
+    card:
+      type: grid
+      columns: 3
+      square: false
+      cards:
+        - type: gauge
+          entity: sensor.solar_collector_temp_clean
+          name: Collector
+          min: 0
+          max: 120
+          severity:
+            green: 30
+            yellow: 55
+            red: 80
+        - type: gauge
+          entity: sensor.sonoff_10021e4b3c_temperature
+          name: Boiler (Winter)
+          min: 0
+          max: 80
+          severity:
+            green: 25
+            yellow: 45
+            red: 65
+        - type: gauge
+          entity: sensor.solar_collector_delta_temperature
+          name: ΔT
+          min: -10
+          max: 40
+          severity:
+            green: 3
+            yellow: 7
+            red: 12
+  - type: conditional
+    conditions:
+      - entity: input_boolean.solar_collector_summer_mode
+        state: "on"
+    card:
+      type: entities
+      title: ☀️ Summer Mode Settings
+      show_header_toggle: false
+      state_color: true
+      entities:
+        - type: section
+          label: Temperature Thresholds
+        - entity: input_number.solar_summer_collector_threshold
+          name: Min Collector T to Start
+          icon: mdi:thermometer-high
+        - entity: input_number.solar_summer_on_delta
+          name: ΔT to Turn ON
+          icon: mdi:thermometer-plus
+        - entity: input_number.solar_summer_off_delta
+          name: ΔT to Turn OFF
+          icon: mdi:thermometer-minus
+        - type: section
+          label: Current Values
+        - entity: sensor.solar_collector_temp_clean
+          name: Collector Temperature
+          icon: mdi:thermometer
+        - entity: sensor.solar_collector_wifi_boiler_temperature
+          name: Boiler Temperature
+          icon: mdi:thermometer
+        - entity: sensor.solar_collector_delta_temperature
+          name: Delta (ΔT)
+          icon: mdi:delta
+  - type: conditional
+    conditions:
+      - entity: input_boolean.solar_collector_summer_mode
+        state: "off"
+    card:
+      type: entities
+      title: ❄️ Winter Mode Settings
+      show_header_toggle: false
+      state_color: true
+      entities:
+        - type: section
+          label: Temperature Thresholds
+        - entity: input_number.solar_winter_collector_threshold
+          name: Min Collector T to Start
+          icon: mdi:thermometer-high
+        - entity: input_number.solar_winter_on_delta
+          name: ΔT to Turn ON
+          icon: mdi:thermometer-plus
+        - entity: input_number.solar_winter_off_delta
+          name: ΔT to Turn OFF
+          icon: mdi:thermometer-minus
+        - type: section
+          label: Current Values
+        - entity: sensor.solar_collector_temp_clean
+          name: Collector Temperature
+          icon: mdi:thermometer
+        - entity: sensor.sonoff_10021e4b3c_temperature
+          name: Boiler Temperature
+          icon: mdi:thermometer
+        - entity: sensor.solar_collector_delta_temperature
+          name: Delta (ΔT)
+          icon: mdi:delta
+  - type: entities
+    title: 🛡️ Protection & Timers
+    show_header_toggle: false
+    entities:
+      - entity: input_number.solar_max_boiler_temp
+        name: Max Boiler Temperature
+        icon: mdi:water-boiler-alert
+      - entity: input_number.solar_on_delay_minutes
+        name: Delay Before Turn ON
+        icon: mdi:timer-sand
+      - entity: input_number.solar_min_switch_interval_minutes
+        name: Min Switch Interval
+        icon: mdi:timer-lock
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: gauge
+        entity: sensor.solar_collector_wifi_solar_collector_wifi_rssi
+        name: Wi-Fi Signal
+        min: -100
+        max: -30
+        unit: dBm
+        severity:
+          red: -90
+          yellow: -75
+          green: -60
+      - type: entity
+        entity: sensor.solar_collector_uptime_human
+        name: Uptime
+  - type: history-graph
+    title: 📈 Temperature History (24h)
+    hours_to_show: 24
+    refresh_interval: 30
+    entities:
+      - sensor.solar_collector_temp_clean
+      - sensor.solar_collector_wifi_boiler_temperature
+      - sensor.sonoff_10021e4b3c_temperature
+      - sensor.solar_collector_delta_temperature
+  - type: markdown
+    content: >
+      ## 📖 Quick Reference
+
+
+      ### Current Mode Logic:
+
+      {% if is_state('input_boolean.solar_collector_summer_mode', 'on') %}
+
+      **☀️ SUMMER MODE**
+
+      - Pump turns **ON** when:
+        - Collector ≥ {{ states('input_number.solar_summer_collector_threshold') }}°C
+        - ΔT ≥ {{ states('input_number.solar_summer_on_delta') }}°C
+        - After {{ states('input_number.solar_on_delay_minutes') }} min delay
+      - Pump turns **OFF** when:
+        - ΔT ≤ {{ states('input_number.solar_summer_off_delta') }}°C
+        - OR Boiler ≥ {{ states('input_number.solar_max_boiler_temp') }}°C
+      {% else %}
+
+      **❄️ WINTER MODE**
+
+      - Pump turns **ON** when:
+        - Collector ≥ {{ states('input_number.solar_winter_collector_threshold') }}°C
+        - ΔT ≥ {{ states('input_number.solar_winter_on_delta') }}°C
+        - After {{ states('input_number.solar_on_delay_minutes') }} min delay
+      - Pump turns **OFF** when:
+        - ΔT ≤ {{ states('input_number.solar_winter_off_delta') }}°C
+        - OR Boiler ≥ {{ states('input_number.solar_max_boiler_temp') }}°C
+      {% endif %}
+
+
+      ### Protection:
+
+      - Min switch interval: {{
+      states('input_number.solar_min_switch_interval_minutes') }} min
+
+      - Emergency shutdown at 90°C
+
+
+      ---
+
+
+      **💡 Tip:** Adjust sliders above to change behavior in real-time!

@@ -1,0 +1,331 @@
+type: grid
+columns: 1
+square: false
+cards:
+  - type: heading
+    heading: Выключатели
+    heading_style: title
+  - type: grid
+    columns: 4
+    square: false
+    cards:
+      - type: custom:button-card
+        entity: switch.invertor_relay_control_invertor_relay
+        name: Инвертор
+        show_label: true
+        label: |
+          [[[ 
+            var run = states['sensor.invertor_run_time_today'].state;
+            var uptime = states['sensor.invertor_relay_control_invertor_uptime'].state;
+            return `<div>Сегодня: ${run} h</div><div style="font-size: 8px; margin-top: 4px;">Uptime: ${parseFloat(uptime).toFixed(1)} h</div>`;
+          ]]]
+        styles:
+          card:
+            - height: 100px
+            - border-radius: 12px
+            - border: 1px solid
+            - transition: all 0.3s ease
+          name:
+            - font-size: 11px
+            - font-weight: bold
+            - color: black
+          label:
+            - font-size: 10px
+            - color: black
+          icon:
+            - color: black
+        state:
+          - value: "on"
+            styles:
+              card:
+                - background-color: gold
+          - value: "off"
+            styles:
+              card:
+                - background-color: white
+      - type: custom:button-card
+        entity: switch.sonoff_10021e4b3c
+        name: Радиатор
+        icon: mdi:radiator
+        show_label: true
+        label: >
+          [[[ return states['sensor.sonoff_10021e4b3c_temperature'].state + '°C'
+          ]]]
+        styles:
+          card:
+            - height: 100px
+            - border-radius: 12px
+            - border: 1px solid
+          name:
+            - font-size: 11px
+            - font-weight: bold
+            - color: black
+          label:
+            - font-size: 10px
+            - color: black
+          icon:
+            - color: black
+        state:
+          - value: "on"
+            styles:
+              card:
+                - background-color: gold
+          - value: "off"
+            styles:
+              card:
+                - background-color: white
+      - type: custom:button-card
+        entity: switch.sonoff_1001191322
+        name: Бойлер
+        icon: mdi:water-boiler
+        show_label: true
+        label: >
+          [[[ return states['sensor.sonoff_1001191322_temperature'].state + '°C'
+          ]]]
+        styles:
+          card:
+            - height: 100px
+            - border-radius: 12px
+            - border: 1px solid
+          name:
+            - font-size: 11px
+            - font-weight: bold
+            - color: black
+          label:
+            - font-size: 10px
+            - color: black
+          icon:
+            - color: black
+        state:
+          - value: "on"
+            styles:
+              card:
+                - background-color: gold
+          - value: "off"
+            styles:
+              card:
+                - background-color: white
+      - type: custom:button-card
+        entity: switch.sonoff_ab300012ee_1
+        name: Зарядка
+        icon: mdi:battery-charging
+        show_label: true
+        label: >
+          [[[ return states['sensor.p_24100bnn160_b00176_battery'].state + '%'
+          ]]]
+        styles:
+          card:
+            - height: 100px
+            - border-radius: 12px
+            - border: 1px solid
+          name:
+            - font-size: 11px
+            - font-weight: bold
+            - color: black
+          label:
+            - font-size: 10px
+            - color: black
+          icon:
+            - color: black
+        state:
+          - value: "on"
+            styles:
+              card:
+                - background-color: gold
+          - value: "off"
+            styles:
+              card:
+                - background-color: white
+  - type: grid
+    columns: 4
+    square: false
+    cards:
+      - type: custom:button-card
+        entity: sensor.mppt_solar_controller_charging_status
+        name: Солн. контр.
+        icon: mdi:solar-panel-large
+        show_label: true
+        tap_action:
+          action: call-service
+          service: button.press
+          service_data:
+            entity_id: button.mppt_solar_controller_refresh
+        label: |
+          [[[ 
+            var status = states['sensor.mppt_solar_controller_charging_status'].state;
+            var current = states['sensor.mppt_solar_controller_charging_current'].state;
+            var power = states['sensor.mppt_solar_controller_charging_power'].state;
+            return `
+              <div style="font-size: 10px; height: 14px; color: black;">${status}</div>
+              <div style="display: flex; justify-content: space-between; margin-top: 12px; font-size: 10px; color: black;">
+                <span>${current}A</span><span>${power}W</span>
+              </div>
+            `;
+          ]]]
+        styles:
+          card:
+            - height: 100px
+            - border-radius: 12px
+            - border: 1px solid
+            - padding: 12px 10px 8px 10px
+            - background-color: white
+            - "--mdc-ripple-color": orange
+            - "--mdc-ripple-press-opacity": 0.5
+          name:
+            - font-size: 11px
+            - font-weight: bold
+            - color: black
+          icon:
+            - width: 30px
+            - color: >
+                [[[ return
+                parseFloat(states['sensor.mppt_solar_controller_charging_power'].state)
+                > 0 ? 'orange' : 'black'; ]]]
+      - type: custom:button-card
+        entity: sensor.p_24100bnn160_b00176_battery
+        name: Батарея
+        icon: mdi:battery
+        show_label: true
+        label: |
+          [[[
+            var v = states['sensor.p_24100bnn160_b00176_voltage'].state;
+            var a = states['sensor.p_24100bnn160_b00176_current'].state;
+            var p = states['sensor.p_24100bnn160_b00176_power'].state;
+            var t = states['sensor.p_24100bnn160_b00176_temperature'].state;
+            var soc = states['sensor.p_24100bnn160_b00176_battery'].state;
+            var runtime = states['sensor.p_24100bnn160_b00176_runtime'].state;
+            return `
+              <div style="font-size: 9px; color: black; line-height: 1.1;">
+                <b>${soc}%</b> (${t}°C)<br/>
+                <span style="font-size: 8px;">R: ${runtime}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 10px; color: black;">
+                <span>${v}V</span><span>${a}A</span>
+              </div>
+              <div style="text-align: center; font-size: 9px; font-weight: bold; margin-top: 2px; color: black;">${p}W</div>
+            `;
+          ]]]
+        styles:
+          card:
+            - height: 100px
+            - border-radius: 12px
+            - border: 1px solid
+            - padding: 8px 10px 8px 10px
+            - background-color: |
+                [[[
+                  var soc = parseFloat(states['sensor.p_24100bnn160_b00176_battery'].state);
+                  if (soc > 80) return '#c8e6c9'; 
+                  if (soc > 40) return '#fff9c4'; 
+                  if (soc > 20) return '#ffe0b2'; 
+                  return '#ffcdd2'; 
+                ]]]
+          name:
+            - font-size: 11px
+            - font-weight: bold
+            - color: black
+          icon:
+            - width: 28px
+            - color: black
+  - type: grid
+    columns: 4
+    square: false
+    cards:
+      - type: custom:button-card
+        entity: sensor.system_monitor_processor_temperature
+        name: CPU Temp
+        show_state: true
+        icon: mdi:raspberry-pi
+        styles:
+          card:
+            - height: 80px
+            - border-radius: 10px
+            - background-color: white
+            - border: 1px solid '#cccccc'
+          state:
+            - font-size: 12px
+            - font-weight: bold
+            - color: black
+          name:
+            - font-size: 10px
+            - color: black
+          icon:
+            - color: |
+                [[[
+                  var t = parseFloat(entity.state);
+                  if (t >= 60) return '#ff4444';
+                  if (t >= 45) return '#ffeb3b';
+                  return '#4caf50';
+                ]]]
+      - type: custom:button-card
+        entity: sensor.system_monitor_processor_use
+        name: CPU Load
+        show_state: true
+        icon: mdi:cpu-64-bit
+        styles:
+          card:
+            - height: 80px
+            - border-radius: 10px
+            - background-color: white
+            - border: 1px solid '#cccccc'
+          state:
+            - font-size: 12px
+            - font-weight: bold
+            - color: black
+          name:
+            - font-size: 10px
+            - color: black
+          icon:
+            - color: |
+                [[[
+                  var l = parseFloat(entity.state);
+                  if (l >= 70) return '#ff4444';
+                  if (l >= 30) return '#ffeb3b';
+                  return '#4caf50';
+                ]]]
+      - type: custom:button-card
+        entity: sensor.system_monitor_memory_usage
+        name: RAM Use
+        show_state: true
+        icon: mdi:memory
+        styles:
+          card:
+            - height: 80px
+            - border-radius: 10px
+            - background-color: white
+            - border: 1px solid '#cccccc'
+          state:
+            - font-size: 12px
+            - font-weight: bold
+            - color: black
+          name:
+            - font-size: 10px
+            - color: black
+          icon:
+            - color: |
+                [[[
+                  var m = parseFloat(entity.state);
+                  if (m >= 80) return '#ff4444';
+                  if (m >= 50) return '#ffeb3b';
+                  return '#4caf50';
+                ]]]
+      - type: custom:button-card
+        entity: sensor.system_monitor_disk_usage
+        name: SSD Free
+        show_state: true
+        icon: mdi:harddisk
+        styles:
+          card:
+            - height: 80px
+            - border-radius: 10px
+            - background-color: white
+            - border: 1px solid '#cccccc'
+          state:
+            - font-size: 14px
+            - font-weight: bold
+            - color: black
+            - padding-top: 5px
+          name:
+            - font-size: 10px
+            - color: black
+          icon:
+            - color: "#4caf50"

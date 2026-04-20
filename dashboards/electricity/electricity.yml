@@ -1,0 +1,16 @@
+type: grid
+cards:
+  - type: heading
+    heading: Тариф на электричество
+    heading_style: title
+  - price: sensor.nordpool_prices_timeline_lv_2
+    view: timeline
+    theme: light
+    slider: true
+    day_switch: true
+    type: custom:price-timeline-card
+    currency:
+      name: ""
+      symbol: ""
+    cheap_times: true
+    start_view: today

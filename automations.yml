@@ -1,0 +1,739 @@
+- id: '1769073713042'
+  alias: Update Nordpool Sensor
+  description: Force Nordpool sensor to refresh
+  triggers:
+  - minutes: /10
+    trigger: time_pattern
+  actions:
+  - target:
+      entity_id: sensor.nordpool_kwh_lv_eur_3_10_0
+    action: homeassistant.update_entity
+  mode: single
+- id: solar_collector_pump_control
+  alias: 'Solar Collector: Pump Control'
+  description: Automatic pump control based on temperatures
+  triggers:
+  - entity_id:
+    - sensor.solar_collector_temp_clean
+    - sensor.solar_collector_wifi_boiler_temperature
+    - sensor.sonoff_10021e4b3c_temperature
+    trigger: state
+  - entity_id: input_boolean.solar_collector_summer_mode
+    trigger: state
+  - minutes: /5
+    trigger: time_pattern
+  conditions:
+  - condition: state
+    entity_id: input_boolean.solar_system_enabled
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.solar_manual_control
+    state: 'off'
+  actions:
+  - variables:
+      summer_mode: '{{ is_state(''input_boolean.solar_collector_summer_mode'', ''on'')
+        }}'
+      collector_temp: '{{ states(''sensor.solar_collector_temp_clean'') | float(0)
+        }}'
+      boiler_temp: '{{ states(''sensor.solar_collector_wifi_boiler_temperature'')
+        | float(0) if is_state(''input_boolean.solar_collector_summer_mode'', ''on'')
+        else states(''sensor.sonoff_10021e4b3c_temperature'') | float(0) }}'
+      delta: '{{ (collector_temp - boiler_temp) | round(2) }}'
+      pump_on: '{{ is_state(''switch.solar_collector_wifi_solar_pump'', ''on'') }}'
+      on_delta: '{{ states(''input_number.solar_summer_on_delta'') | float(12) if
+        is_state(''input_boolean.solar_collector_summer_mode'', ''on'') else states(''input_number.solar_winter_on_delta'')
+        | float(3) }}'
+      off_delta: '{{ states(''input_number.solar_summer_off_delta'') | float(2) if
+        is_state(''input_boolean.solar_collector_summer_mode'', ''on'') else states(''input_number.solar_winter_off_delta'')
+        | float(1) }}'
+      collector_threshold: '{{ states(''input_number.solar_summer_collector_threshold'')
+        | float(45) if is_state(''input_boolean.solar_collector_summer_mode'', ''on'')
+        else states(''input_number.solar_winter_collector_threshold'') | float(20)
+        }}'
+      max_boiler_temp: '{{ states(''input_number.solar_max_boiler_temp'') | float(85)
+        }}'
+      min_interval_minutes: '{{ states(''input_number.solar_min_switch_interval_minutes'')
+        | int(5) }}'
+      last_switch: '{{ as_timestamp(states(''input_datetime.solar_last_switch_time''))
+        | float(0) }}'
+  - data:
+      message: 'Solar: Mode={{ ''Summer'' if summer_mode else ''Winter'' }}, T_col={{
+        collector_temp }}°C, T_boil={{ boiler_temp }}°C, ΔT={{ delta }}°C, Pump={{
+        pump_on }}, Thresholds: on={{ on_delta }}, off={{ off_delta }}, col={{ collector_threshold
+        }}'
+      level: info
+    action: system_log.write
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ not pump_on }}'
+      - condition: template
+        value_template: '{{ (((as_timestamp(now()) - last_switch) / 60) | int) >=
+          min_interval_minutes or last_switch == 0 }}'
+      - condition: template
+        value_template: '{{ collector_temp >= collector_threshold }}'
+      - condition: template
+        value_template: '{{ delta >= on_delta }}'
+      - condition: template
+        value_template: '{{ boiler_temp < max_boiler_temp }}'
+      sequence:
+      - target:
+          entity_id: switch.solar_collector_wifi_solar_pump
+        action: switch.turn_on
+      - target:
+          entity_id: input_datetime.solar_last_switch_time
+        data:
+          datetime: '{{ now().isoformat() }}'
+        action: input_datetime.set_datetime
+      - target:
+          entity_id: counter.solar_pump_on_counter
+        action: counter.increment
+      - data:
+          title: ☀️ Solar Collector
+          message: Pump ON ({{ 'Summer' if summer_mode else 'Winter' }} mode) ΔT =
+            {{ delta }}°C (threshold {{ on_delta }}°C) Collector = {{ collector_temp
+            }}°C Boiler = {{ boiler_temp }}°C
+        action: persistent_notification.create
+    - conditions:
+      - condition: template
+        value_template: '{{ pump_on }}'
+      - condition: template
+        value_template: '{{ (((as_timestamp(now()) - last_switch) / 60) | int) >=
+          min_interval_minutes or last_switch == 0 }}'
+      - condition: or
+        conditions:
+        - condition: template
+          value_template: '{{ delta <= off_delta }}'
+        - condition: template
+          value_template: '{{ boiler_temp >= max_boiler_temp }}'
+      sequence:
+      - target:
+          entity_id: switch.solar_collector_wifi_solar_pump
+        action: switch.turn_off
+      - target:
+          entity_id: input_datetime.solar_last_switch_time
+        data:
+          datetime: '{{ now().isoformat() }}'
+        action: input_datetime.set_datetime
+      - data:
+          title: ☀️ Solar Collector
+          message: Pump OFF ({{ 'Summer' if summer_mode else 'Winter' }} mode) ΔT
+            = {{ delta }}°C (threshold {{ off_delta }}°C) Collector = {{ collector_temp
+            }}°C Boiler = {{ boiler_temp }}°C{% if boiler_temp >= max_boiler_temp
+            %} (Max temperature reached){% endif %}
+        action: persistent_notification.create
+  mode: single
+- id: solar_manual_control_on
+  alias: 'Solar Collector: Manual Control ON'
+  trigger:
+  - platform: state
+    entity_id: input_boolean.solar_manual_control
+    to: 'on'
+  action:
+  - service: persistent_notification.create
+    data:
+      title: ☀️ Solar Collector
+      message: Manual control enabled. Automation disabled.
+- id: solar_counter_reset
+  alias: 'Solar Collector: Counter Reset'
+  trigger:
+  - platform: time
+    at: 00:00:00
+  action:
+  - service: counter.reset
+    target:
+      entity_id: counter.solar_pump_on_counter
+- id: solar_mode_change
+  alias: 'Solar Collector: Mode Change'
+  trigger:
+  - platform: state
+    entity_id: input_boolean.solar_collector_summer_mode
+  action:
+  - service: persistent_notification.create
+    data:
+      title: ☀️ Solar Collector
+      message: 'Mode: {{ ''SUMMER ☀️'' if is_state(''input_boolean.solar_collector_summer_mode'',
+        ''on'') else ''WINTER ❄️'' }} New thresholds: ΔT ON: {{ states(''input_number.solar_summer_on_delta''
+        if is_state(''input_boolean.solar_collector_summer_mode'', ''on'') else ''input_number.solar_winter_on_delta'')
+        }}°C ΔT OFF: {{ states(''input_number.solar_summer_off_delta'' if is_state(''input_boolean.solar_collector_summer_mode'',
+        ''on'') else ''input_number.solar_winter_off_delta'') }}°C
+
+        '
+- id: solar_overheat_protection
+  alias: 'Solar Collector: Overheat Protection'
+  trigger:
+  - platform: numeric_state
+    entity_id:
+    - sensor.solar_collector_wifi_boiler_temperature
+    - sensor.sonoff_10021e4b3c_temperature
+    above: 90
+  condition:
+  - condition: state
+    entity_id: switch.solar_collector_wifi_solar_pump
+    state: 'on'
+  action:
+  - service: switch.turn_off
+    target:
+      entity_id: switch.solar_collector_wifi_solar_pump
+  - service: persistent_notification.create
+    data:
+      title: ⚠️ SOLAR COLLECTOR ALERT
+      message: 'EMERGENCY SHUTDOWN! Temperature reached {{ trigger.to_state.state
+        }}°C Pump automatically turned off.
+
+        '
+- id: '1769433708146'
+  alias: CEW Battery Charge Start
+  description: ''
+  triggers:
+  - entity_id: input_boolean.cew_charge_trigger
+    to: 'on'
+    trigger: state
+  actions:
+  - condition: numeric_state
+    entity_id: sensor.p_24100bnn160_b00176_battery
+    below: 80
+  - target:
+      entity_id: switch.sonoff_ab300012ee_1
+    action: switch.turn_on
+  mode: single
+- id: '1769433745580'
+  alias: CEW Battery Charge Stop
+  description: ''
+  triggers:
+  - entity_id: input_boolean.cew_charge_trigger
+    to: 'off'
+    trigger: state
+  actions:
+  - target:
+      entity_id: switch.sonoff_ab300012ee_1
+    action: switch.turn_off
+  mode: single
+- alias: CEW - Battery Control (Auto-Managed - DO NOT EDIT OR DELETE)
+  description: Control your home battery based on Cheapest Energy Windows calculations
+  mode: queued
+  max: 10
+  trigger:
+  - platform: state
+    entity_id: switch.cew_automation_enabled
+    to: 'off'
+    id: automation_disabled
+  - platform: state
+    entity_id: sensor.cew_today
+    to: charge
+    from:
+    - discharge
+    - discharge_aggressive
+    - idle
+    - 'off'
+    id: charge_start
+  - platform: state
+    entity_id: sensor.cew_today
+    to: discharge
+    from:
+    - charge
+    - discharge_aggressive
+    - idle
+    - 'off'
+    id: discharge_start
+  - platform: state
+    entity_id: sensor.cew_today
+    to: discharge_aggressive
+    from:
+    - charge
+    - discharge
+    - idle
+    - 'off'
+    id: discharge_aggressive_start
+  - platform: state
+    entity_id: sensor.cew_today
+    to: idle
+    from:
+    - charge
+    - discharge
+    - discharge_aggressive
+    - 'off'
+    id: idle_start
+  - platform: state
+    entity_id: sensor.cew_today
+    to: 'off'
+    from:
+    - charge
+    - discharge
+    - discharge_aggressive
+    - idle
+    id: off_start
+  - platform: time
+    at: 00:00:10
+    id: midnight_rotation
+  condition:
+  - condition: or
+    conditions:
+    - condition: trigger
+      id: midnight_rotation
+    - condition: template
+      value_template: '{{ trigger.from_state.state != ''unavailable'' }}'
+  action:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: charge_start
+      sequence:
+      - choose:
+        - conditions:
+          - condition: state
+            entity_id: switch.cew_notifications_enabled
+            state: 'on'
+          - condition: state
+            entity_id: switch.cew_notify_charging
+            state: 'on'
+          - condition: or
+            conditions:
+            - condition: state
+              entity_id: switch.cew_quiet_hours_enabled
+              state: 'off'
+            - condition: template
+              value_template: '{% set now_time = now().strftime(''%H:%M'') %} {% set
+                quiet_start = states(''time.cew_quiet_hours_start'') %} {% set quiet_end
+                = states(''time.cew_quiet_hours_end'') %} {{ now_time < quiet_start
+                or now_time >= quiet_end }}'
+          sequence:
+          - service: notify.notify
+            data:
+              title: '🔋 CEW: Charging Mode Started'
+              message: 'Current price: €{{ state_attr(''sensor.cew_today'', ''current_price'')
+                | float(0) | round(5) }}/kWh
+
+                Avg cheap price: €{{ state_attr(''sensor.cew_today'', ''avg_cheap_price'')
+                | float(0) | round(5) }}/kWh
+
+                Charge power: {{ states(''number.cew_charge_power'') }}W
+
+                Spread: {{ state_attr(''sensor.cew_today'', ''spread_avg'') | float(0)
+                | round(1) }}%'
+        default: []
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{% set entity = states(''text.cew_battery_charge_action'')
+              %} {{ entity != ''not_configured'' and entity != ''unknown'' and entity
+              != '''' }}'
+          sequence:
+          - service: "{% if states('text.cew_battery_charge_action').startswith('automation.')\
+              \ %}\n  automation.trigger\n{% elif states('text.cew_battery_charge_action').startswith('script.')\
+              \ %}\n  script.turn_on\n{% elif states('text.cew_battery_charge_action').startswith('scene.')\
+              \ %}\n  scene.turn_on\n{% endif %}\n"
+            target:
+              entity_id: '{{ states(''text.cew_battery_charge_action'') }}'
+        default: []
+    - conditions:
+      - condition: trigger
+        id: discharge_start
+      sequence:
+      - choose:
+        - conditions:
+          - condition: state
+            entity_id: switch.cew_battery_use_soc_safety
+            state: 'on'
+          - condition: state
+            entity_id: text.cew_battery_soc_sensor
+            state: not_configured
+          sequence:
+          - condition: and
+            conditions:
+            - condition: state
+              entity_id: switch.cew_notifications_enabled
+              state: 'on'
+            - condition: or
+              conditions:
+              - condition: state
+                entity_id: switch.cew_quiet_hours_enabled
+                state: 'off'
+              - condition: template
+                value_template: '{% set now_time = now().strftime(''%H:%M'') %} {%
+                  set quiet_start = states(''time.cew_quiet_hours_start'') %} {% set
+                  quiet_end = states(''time.cew_quiet_hours_end'') %} {{ now_time
+                  < quiet_start or now_time >= quiet_end }}'
+          - service: notify.notify
+            data:
+              title: '⚠️ CEW: SOC Safety Misconfigured'
+              message: 'Battery SOC Safety is enabled but battery sensor is not configured.
+
+                Please configure the battery SOC sensor in Settings or disable SOC
+                Safety.'
+          - stop: SOC safety enabled but sensor not configured
+        - conditions:
+          - condition: state
+            entity_id: switch.cew_battery_use_soc_safety
+            state: 'on'
+          - condition: template
+            value_template: '{% set sensor = states(''text.cew_battery_soc_sensor'')
+              %} {% set min_soc = states(''number.cew_battery_min_soc_discharge'')
+              | float(20) %} {% set current_soc = states(sensor) | float(-1) %} {{
+              sensor != ''not_configured'' and current_soc >= 0 and current_soc <=
+              min_soc }}'
+          sequence:
+          - service: input_text.set_value
+            target:
+              entity_id: input_text.cew_current_mode
+            data:
+              value: idle
+          - condition: and
+            conditions:
+            - condition: state
+              entity_id: switch.cew_notifications_enabled
+              state: 'on'
+            - condition: or
+              conditions:
+              - condition: state
+                entity_id: switch.cew_quiet_hours_enabled
+                state: 'off'
+              - condition: template
+                value_template: '{% set now_time = now().strftime(''%H:%M'') %} {%
+                  set quiet_start = states(''time.cew_quiet_hours_start'') %} {% set
+                  quiet_end = states(''time.cew_quiet_hours_end'') %} {{ now_time
+                  < quiet_start or now_time >= quiet_end }}'
+          - service: notify.notify
+            data:
+              title: '🔋 CEW: Discharge Blocked by SOC Safety'
+              message: '{% set sensor = states(''text.cew_battery_soc_sensor'') %}
+                {% set min_soc = states(''number.cew_battery_min_soc_discharge'')
+                | float(20) %} {% set current_soc = states(sensor) | float(0) %} Battery
+                SOC ({{ current_soc }}%) is at or below minimum discharge limit ({{
+                min_soc }}%).
+
+                Mode set to idle to protect battery.'
+          - stop: SOC below minimum discharge threshold
+      - choose:
+        - conditions:
+          - condition: state
+            entity_id: switch.cew_notifications_enabled
+            state: 'on'
+          - condition: state
+            entity_id: switch.cew_notify_discharge
+            state: 'on'
+          - condition: or
+            conditions:
+            - condition: state
+              entity_id: switch.cew_quiet_hours_enabled
+              state: 'off'
+            - condition: template
+              value_template: '{% set now_time = now().strftime(''%H:%M'') %} {% set
+                quiet_start = states(''time.cew_quiet_hours_start'') %} {% set quiet_end
+                = states(''time.cew_quiet_hours_end'') %} {{ now_time < quiet_start
+                or now_time >= quiet_end }}'
+          sequence:
+          - service: notify.notify
+            data:
+              title: '⚡ CEW: Discharge Mode Started'
+              message: 'Current price: €{{ state_attr(''sensor.cew_today'', ''current_price'')
+                | float(0) | round(5) }}/kWh
+
+                Avg expensive price: €{{ state_attr(''sensor.cew_today'', ''avg_expensive_price'')
+                | float(0) | round(5) }}/kWh
+
+                Discharge power: {{ states(''number.cew_discharge_power'') }}W
+
+                Spread: {{ state_attr(''sensor.cew_today'', ''spread_avg'') | float(0)
+                | round(1) }}%'
+        default: []
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{% set entity = states(''text.cew_battery_discharge_action'')
+              %} {{ entity != ''not_configured'' and entity != ''unknown'' and entity
+              != '''' }}'
+          sequence:
+          - service: "{% if states('text.cew_battery_discharge_action').startswith('automation.')\
+              \ %}\n  automation.trigger\n{% elif states('text.cew_battery_discharge_action').startswith('script.')\
+              \ %}\n  script.turn_on\n{% elif states('text.cew_battery_discharge_action').startswith('scene.')\
+              \ %}\n  scene.turn_on\n{% endif %}\n"
+            target:
+              entity_id: '{{ states(''text.cew_battery_discharge_action'') }}'
+        default: []
+    - conditions:
+      - condition: trigger
+        id: discharge_aggressive_start
+      sequence:
+      - choose:
+        - conditions:
+          - condition: state
+            entity_id: switch.cew_battery_use_soc_safety
+            state: 'on'
+          - condition: state
+            entity_id: text.cew_battery_soc_sensor
+            state: not_configured
+          sequence:
+          - condition: and
+            conditions:
+            - condition: state
+              entity_id: switch.cew_notifications_enabled
+              state: 'on'
+            - condition: or
+              conditions:
+              - condition: state
+                entity_id: switch.cew_quiet_hours_enabled
+                state: 'off'
+              - condition: template
+                value_template: '{% set now_time = now().strftime(''%H:%M'') %} {%
+                  set quiet_start = states(''time.cew_quiet_hours_start'') %} {% set
+                  quiet_end = states(''time.cew_quiet_hours_end'') %} {{ now_time
+                  < quiet_start or now_time >= quiet_end }}'
+          - service: notify.notify
+            data:
+              title: '⚠️ CEW: SOC Safety Misconfigured'
+              message: 'Battery SOC Safety is enabled but battery sensor is not configured.
+
+                Please configure the battery SOC sensor in Settings or disable SOC
+                Safety.'
+          - stop: SOC safety enabled but sensor not configured
+        - conditions:
+          - condition: state
+            entity_id: switch.cew_battery_use_soc_safety
+            state: 'on'
+          - condition: template
+            value_template: '{% set sensor = states(''text.cew_battery_soc_sensor'')
+              %} {% set min_soc = states(''number.cew_battery_min_soc_aggressive_discharge'')
+              | float(30) %} {% set current_soc = states(sensor) | float(-1) %} {{
+              sensor != ''not_configured'' and current_soc >= 0 and current_soc <=
+              min_soc }}'
+          sequence:
+          - service: input_text.set_value
+            target:
+              entity_id: input_text.cew_current_mode
+            data:
+              value: idle
+          - condition: and
+            conditions:
+            - condition: state
+              entity_id: switch.cew_notifications_enabled
+              state: 'on'
+            - condition: or
+              conditions:
+              - condition: state
+                entity_id: switch.cew_quiet_hours_enabled
+                state: 'off'
+              - condition: template
+                value_template: '{% set now_time = now().strftime(''%H:%M'') %} {%
+                  set quiet_start = states(''time.cew_quiet_hours_start'') %} {% set
+                  quiet_end = states(''time.cew_quiet_hours_end'') %} {{ now_time
+                  < quiet_start or now_time >= quiet_end }}'
+          - service: notify.notify
+            data:
+              title: '🔋 CEW: Aggressive Discharge Blocked by SOC Safety'
+              message: '{% set sensor = states(''text.cew_battery_soc_sensor'') %}
+                {% set min_soc = states(''number.cew_battery_min_soc_aggressive_discharge'')
+                | float(30) %} {% set current_soc = states(sensor) | float(0) %} Battery
+                SOC ({{ current_soc }}%) is at or below minimum aggressive discharge
+                limit ({{ min_soc }}%).
+
+                Mode set to idle to protect battery.'
+          - stop: SOC below minimum aggressive discharge threshold
+      - choose:
+        - conditions:
+          - condition: state
+            entity_id: switch.cew_notifications_enabled
+            state: 'on'
+          - condition: state
+            entity_id: switch.cew_notify_discharge_aggressive
+            state: 'on'
+          - condition: or
+            conditions:
+            - condition: state
+              entity_id: switch.cew_quiet_hours_enabled
+              state: 'off'
+            - condition: template
+              value_template: '{% set now_time = now().strftime(''%H:%M'') %} {% set
+                quiet_start = states(''time.cew_quiet_hours_start'') %} {% set quiet_end
+                = states(''time.cew_quiet_hours_end'') %} {{ now_time < quiet_start
+                or now_time >= quiet_end }}'
+          sequence:
+          - service: notify.notify
+            data:
+              title: '🚨 CEW: Aggressive Discharge Started'
+              message: 'Current price: €{{ state_attr(''sensor.cew_today'', ''current_price'')
+                | float(0) | round(5) }}/kWh
+
+                Avg expensive price: €{{ state_attr(''sensor.cew_today'', ''avg_expensive_price'')
+                | float(0) | round(5) }}/kWh
+
+                Max discharge power: {{ states(''number.cew_discharge_power'') }}W
+
+                Spread: {{ state_attr(''sensor.cew_today'', ''spread_avg'') | float(0)
+                | round(1) }}%'
+        default: []
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{% set entity = states(''text.cew_battery_aggressive_discharge_action'')
+              %} {{ entity != ''not_configured'' and entity != ''unknown'' and entity
+              != '''' }}'
+          sequence:
+          - service: "{% if states('text.cew_battery_aggressive_discharge_action').startswith('automation.')\
+              \ %}\n  automation.trigger\n{% elif states('text.cew_battery_aggressive_discharge_action').startswith('script.')\
+              \ %}\n  script.turn_on\n{% elif states('text.cew_battery_aggressive_discharge_action').startswith('scene.')\
+              \ %}\n  scene.turn_on\n{% endif %}\n"
+            target:
+              entity_id: '{{ states(''text.cew_battery_aggressive_discharge_action'')
+                }}'
+        default: []
+    - conditions:
+      - condition: trigger
+        id: idle_start
+      sequence:
+      - choose:
+        - conditions:
+          - condition: state
+            entity_id: switch.cew_notifications_enabled
+            state: 'on'
+          - condition: state
+            entity_id: switch.cew_notify_idle
+            state: 'on'
+          - condition: or
+            conditions:
+            - condition: state
+              entity_id: switch.cew_quiet_hours_enabled
+              state: 'off'
+            - condition: template
+              value_template: '{% set now_time = now().strftime(''%H:%M'') %} {% set
+                quiet_start = states(''time.cew_quiet_hours_start'') %} {% set quiet_end
+                = states(''time.cew_quiet_hours_end'') %} {{ now_time < quiet_start
+                or now_time >= quiet_end }}'
+          sequence:
+          - service: notify.notify
+            data:
+              title: '💤 CEW: Normal/idle Mode Started'
+              message: 'Current price: €{{ state_attr(''sensor.cew_today'', ''current_price'')
+                | float(0) | round(5) }}/kWh
+
+                Spread: {{ state_attr(''sensor.cew_today'', ''spread_avg'') | float(0)
+                | round(1) }}%'
+        default: []
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{% set entity = states(''text.cew_battery_idle_action'')
+              %} {{ entity != ''not_configured'' and entity != ''unknown'' and entity
+              != '''' }}'
+          sequence:
+          - service: "{% if states('text.cew_battery_idle_action').startswith('automation.')\
+              \ %}\n  automation.trigger\n{% elif states('text.cew_battery_idle_action').startswith('script.')\
+              \ %}\n  script.turn_on\n{% elif states('text.cew_battery_idle_action').startswith('scene.')\
+              \ %}\n  scene.turn_on\n{% endif %}\n"
+            target:
+              entity_id: '{{ states(''text.cew_battery_idle_action'') }}'
+        default: []
+    - conditions:
+      - condition: trigger
+        id: off_start
+      sequence:
+      - choose:
+        - conditions:
+          - condition: state
+            entity_id: switch.cew_notifications_enabled
+            state: 'on'
+          - condition: state
+            entity_id: switch.cew_notify_off
+            state: 'on'
+          - condition: or
+            conditions:
+            - condition: state
+              entity_id: switch.cew_quiet_hours_enabled
+              state: 'off'
+            - condition: template
+              value_template: '{% set now_time = now().strftime(''%H:%M'') %} {% set
+                quiet_start = states(''time.cew_quiet_hours_start'') %} {% set quiet_end
+                = states(''time.cew_quiet_hours_end'') %} {{ now_time < quiet_start
+                or now_time >= quiet_end }}'
+          sequence:
+          - service: notify.notify
+            data:
+              title: '🔌 CEW: Battery Off'
+              message: Battery operations suspended.
+        default: []
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{% set entity = states(''text.cew_battery_off_action'')
+              %} {{ entity != ''not_configured'' and entity != ''unknown'' and entity
+              != '''' }}'
+          sequence:
+          - service: "{% if states('text.cew_battery_off_action').startswith('automation.')\
+              \ %}\n  automation.trigger\n{% elif states('text.cew_battery_off_action').startswith('script.')\
+              \ %}\n  script.turn_on\n{% elif states('text.cew_battery_off_action').startswith('scene.')\
+              \ %}\n  scene.turn_on\n{% endif %}\n"
+            target:
+              entity_id: '{{ states(''text.cew_battery_off_action'') }}'
+        default: []
+    - conditions:
+      - condition: trigger
+        id: automation_disabled
+      sequence:
+      - choose:
+        - conditions:
+          - condition: state
+            entity_id: switch.cew_notifications_enabled
+            state: 'on'
+          - condition: state
+            entity_id: switch.cew_notify_automation_disabled
+            state: 'on'
+          - condition: or
+            conditions:
+            - condition: state
+              entity_id: switch.cew_quiet_hours_enabled
+              state: 'off'
+            - condition: template
+              value_template: '{% set now_time = now().strftime(''%H:%M'') %} {% set
+                quiet_start = states(''time.cew_quiet_hours_start'') %} {% set quiet_end
+                = states(''time.cew_quiet_hours_end'') %} {{ now_time < quiet_start
+                or now_time >= quiet_end }}'
+          sequence:
+          - service: notify.notify
+            data:
+              title: '⛔ CEW: Automation Disabled'
+              message: CEW automation has been turned off.
+        default: []
+    - conditions:
+      - condition: trigger
+        id: midnight_rotation
+      - condition: state
+        entity_id: switch.cew_tomorrow_settings_enabled
+        state: 'on'
+      sequence:
+      - service: cheapest_energy_windows.rotate_tomorrow_settings
+        data: {}
+      - delay:
+          seconds: 2
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.cew_today
+      - service: switch.turn_off
+        target:
+          entity_id: switch.cew_tomorrow_settings_enabled
+      - choose:
+        - conditions:
+          - condition: state
+            entity_id: switch.cew_notifications_enabled
+            state: 'on'
+          - condition: state
+            entity_id: switch.cew_midnight_rotation_notifications
+            state: 'on'
+          - condition: or
+            conditions:
+            - condition: state
+              entity_id: switch.cew_quiet_hours_enabled
+              state: 'off'
+            - condition: template
+              value_template: "{% set now = now().strftime('%H:%M') %} {% set quiet_start\
+                \ = states('time.cew_quiet_hours_start') %} {% set quiet_end = states('time.cew_quiet_hours_end')\
+                \ %} {% if quiet_start < quiet_end %}\n  {{ now < quiet_start or now\
+                \ >= quiet_end }}\n{% else %}\n  {{ now < quiet_start and now >= quiet_end\
+                \ }}\n{% endif %}"
+          sequence:
+          - service: notify.notify
+            data:
+              title: '🔄 CEW: Settings Rotated'
+              message: Tomorrow's settings have been applied to today
+        default: []
+    default: []
+  id: cheapest_energy_windows_notifications

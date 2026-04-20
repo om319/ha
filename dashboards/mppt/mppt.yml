@@ -1,0 +1,30 @@
+type: grid
+cards:
+  - type: heading
+    heading: MPPT Solar Controller (5 min refresh)
+    heading_style: title
+  - type: entities
+    entities:
+      - entity: sensor.mppt_solar_controller_pv_voltage
+        name: Solar Panel Voltage
+      - entity: sensor.mppt_solar_controller_charging_power
+        name: Charging Power
+      - entity: sensor.mppt_solar_controller_battery_voltage
+        name: Battery Voltage
+      - entity: sensor.mppt_solar_controller_battery_state_of_charge
+        name: Battery SOC
+      - entity: sensor.mppt_solar_controller_energy_generated_today
+        name: Energy Today
+      - entity: sensor.mppt_solar_controller_load_status
+        name: Load Output
+      - entity: sensor.mppt_solar_controller_load_power
+        name: Load Power
+      - entity: sensor.mppt_solar_controller_controller_temperature
+        name: Controller Temp
+      - entity: sensor.mppt_solar_controller_charging_status
+        name: Charging status
+      - entity: button.mppt_solar_controller_refresh
+        name: Refresh Now
+    cards:
+      - type: heading
+        heading: Solar Controller

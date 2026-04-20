@@ -1,0 +1,268 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+recorder:
+  exclude:
+    entities:
+      - sensor.nordpool_price_c_per_kwh
+      - sensor.nordpool_prices
+
+# ===== NORDPOOL INTEGRATION =====
+sensor:
+  - platform: nordpool
+    region: "LV"
+    currency: "EUR"
+    VAT: True
+    precision: 3
+    low_price_cutoff: 1.0
+    price_type: kWh
+    additional_costs: 0.0
+    
+
+  # Статистика инвертора
+  - platform: history_stats
+    name: "Invertor Run Time Today"
+    entity_id: switch.invertor_relay_control_invertor_relay
+    state: "on"
+    type: time
+    start: "{{ now().replace(hour=0, minute=0, second=0) }}"
+    end: "{{ now() }}"    
+    
+    #солнечный контроллер
+  - platform: pq_mppt
+    mac: "c8:47:80:07:e9:4a"       # ← your MPPT controller MAC address
+    name: "MPPT Solar Controller"   # optional, used as prefix for sensor names
+    scan_interval: 300              # seconds between updates (default: 300 = 5 min)
+    timeout: 15                     # BLE connection timeout in seconds (default: 15)
+
+button:
+  - platform: pq_mppt
+    mac: "c8:47:80:07:e9:4a"       # ← must match the MAC in sensor above
+    name: "MPPT Solar Controller"   # optional, must match the name in sensor above
+
+# ===== SUMMER / WINTER SWITCH =====
+input_boolean:
+  solar_collector_summer_mode:
+    name: Summer Mode
+    icon: mdi:white-balance-sunny
+  
+  solar_manual_control:
+    name: Manual Control
+    icon: mdi:hand-back-right
+  
+  solar_system_enabled:
+    name: System Enabled
+    icon: mdi:power
+    initial: true
+
+# ===== SOLAR COLLECTOR SETTINGS =====
+input_number:
+  solar_summer_on_delta:
+    name: "Summer: ΔT ON"
+    min: 5
+    max: 20
+    step: 0.5
+    initial: 12.0
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-plus
+
+  solar_summer_off_delta:
+    name: "Summer: ΔT OFF"
+    min: 1
+    max: 10
+    step: 0.5
+    initial: 2.0
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-minus
+
+  solar_summer_collector_threshold:
+    name: "Summer: Min Collector T"
+    min: 30
+    max: 60
+    step: 1
+    initial: 45
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-alert
+
+  solar_winter_on_delta:
+    name: "Winter: ΔT ON"
+    min: 1
+    max: 10
+    step: 0.5
+    initial: 3.0
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-plus
+
+  solar_winter_off_delta:
+    name: "Winter: ΔT OFF"
+    min: 0.5
+    max: 5
+    step: 0.5
+    initial: 1.0
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-minus
+
+  solar_winter_collector_threshold:
+    name: "Winter: Min Collector T"
+    min: 10
+    max: 30
+    step: 1
+    initial: 20
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-alert
+
+  solar_on_delay_minutes:
+    name: "ON Delay"
+    min: 1
+    max: 15
+    step: 1
+    initial: 5
+    unit_of_measurement: "min"
+    icon: mdi:timer-sand
+
+  solar_min_switch_interval_minutes:
+    name: "Min Switch Interval"
+    min: 3
+    max: 15
+    step: 1
+    initial: 5
+    unit_of_measurement: "min"
+    icon: mdi:timer-lock
+
+  solar_max_boiler_temp:
+    name: "Max Boiler T"
+    min: 60
+    max: 95
+    step: 1
+    initial: 85
+    unit_of_measurement: "°C"
+    icon: mdi:water-boiler-alert
+
+input_datetime:
+  solar_last_switch_time:
+    name: "Last Switch Time"
+    has_date: true
+    has_time: true
+
+# ===== TEMPLATES =====
+template:
+  - sensor:
+  
+      - name: "Solar Collector Temp Clean"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state: >
+          {% set raw = states('sensor.solar_collector_wifi_collector_temperature') %}
+          {% if raw | is_number and raw | float > 0.1 %}
+            {{ raw | float | round(1) }}
+          {% else %}
+            {{ states('sensor.solar_collector_temp_clean') | float(default=states('sensor.solar_collector_wifi_boiler_temperature')|float(20)) | round(1) }}
+          {% endif %}
+
+      - name: "Solar Collector Delta Temperature"
+        unit_of_measurement: "°C"
+        state: >
+          {# Используем очищенный датчик вместо сырого #}
+          {% set collector = states('sensor.solar_collector_temp_clean') | float(0) %}
+          {% if is_state('input_boolean.solar_collector_summer_mode', 'on') %}
+            {{ (collector - states('sensor.solar_collector_wifi_boiler_temperature') | float(0)) | round(2) }}
+          {% else %}
+            {{ (collector - states('sensor.sonoff_10021e4b3c_temperature') | float(0)) | round(2) }}
+          {% endif %}
+
+      - name: "Solar Collector Uptime Human"
+        icon: mdi:timer-outline
+        state: >
+          {% set s = states('sensor.solar_collector_wifi_solar_collector_uptime') | int(0) %}
+          {% set d = s // 86400 %}
+          {% set h = (s % 86400) // 3600 %}
+          {% set m = (s % 3600) // 60 %}
+          {{ d }}d {{ h }}h {{ m }}m
+
+      - name: "Solar System Status"
+        state: >
+          {% set manual = is_state('input_boolean.solar_manual_control', 'on') %}
+          {% set enabled = is_state('input_boolean.solar_system_enabled', 'on') %}
+          {% set pump = is_state('switch.solar_collector_wifi_solar_pump', 'on') %}
+          {% set summer = is_state('input_boolean.solar_collector_summer_mode', 'on') %}
+          {% if not enabled %} Disabled
+          {% elif manual %} Manual Mode
+          {% elif pump %} Pump ON ({{ 'Summer' if summer else 'Winter' }})
+          {% else %} Waiting ({{ 'Summer' if summer else 'Winter' }})
+          {% endif %}
+        icon: >
+          {% if is_state('switch.solar_collector_wifi_solar_pump', 'on') %}
+            mdi:pump
+          {% else %}
+            mdi:pump-off
+          {% endif %}
+
+      # ===== NORDPOOL PRICE SENSOR FOR APPS =====
+      - name: "Nordpool Prices"
+        unique_id: nordpool_electricity_price
+        state: "{{ states('sensor.nordpool_kwh_lv_eur_3_10_0') }}"
+        unit_of_measurement: "EUR/kWh"
+        device_class: monetary
+        attributes:
+          raw_today: "{{ state_attr('sensor.nordpool_kwh_lv_eur_3_10_0', 'raw_today') }}"
+          raw_tomorrow: "{{ state_attr('sensor.nordpool_kwh_lv_eur_3_10_0', 'raw_tomorrow') }}"
+          today: "{{ state_attr('sensor.nordpool_kwh_lv_eur_3_10_0', 'today') }}"
+          tomorrow: "{{ state_attr('sensor.nordpool_kwh_lv_eur_3_10_0', 'tomorrow') }}"
+
+      # ===== TEST BATTERY SENSORS =====
+      - name: "TEST Battery Level"
+        unique_id: test_battery_level
+        state: "25"
+        unit_of_measurement: "%"
+        device_class: battery
+        state_class: measurement
+
+      - name: "TEST Battery Stored Energy"
+        unique_id: test_battery_stored_energy
+        state: "150"
+        unit_of_measurement: "Wh"
+        device_class: energy_storage
+        state_class: measurement
+
+      # ===== NORDPOOL PRICES TIMELINE LV =====
+      - name: "Nordpool Prices Timeline LV"
+        state: "{{ now().isoformat() }}"
+        attributes:
+          data: >
+            {% set all = namespace(prices=[]) %}
+            {% set raw_today = state_attr('sensor.nordpool_kwh_lv_eur_3_10_0','raw_today') %}
+            {% if raw_today %}
+              {% for item in raw_today %}
+                {% set all.prices = all.prices + [{
+                  'start_time': (item.start | as_datetime | as_local).isoformat(),
+                  'end_time': (item.end | as_datetime | as_local).isoformat(),
+                  'price_per_kwh': (item.value / 100) | round(6)
+                }] %}
+              {% endfor %}
+            {% endif %}
+            {% set raw_tomorrow = state_attr('sensor.nordpool_kwh_lv_eur_3_10_0','raw_tomorrow') %}
+            {% if raw_tomorrow %}
+              {% for item in raw_tomorrow %}
+                {% set all.prices = all.prices + [{
+                  'start_time': (item.start | as_datetime | as_local).isoformat(),
+                  'end_time': (item.end | as_datetime | as_local).isoformat(),
+                  'price_per_kwh': (item.value / 100) | round(6)
+                }] %}
+              {% endfor %}
+            {% endif %}
+            {{ all.prices | sort(attribute='start_time') }}
+
+# ===== COUNTERS =====
+counter:
+  solar_pump_on_counter:
+    name: "Pump ON Counter"
+    icon: mdi:counter
+    restore: true

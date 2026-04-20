@@ -1,0 +1,21 @@
+battery_charge_start:
+  alias: Начать зарядку батареи
+  sequence:
+  - target:
+      entity_id: switch.sonoff_ab300012ee_1
+    action: switch.turn_on
+  mode: single
+battery_charge_stop:
+  alias: Остановить зарядку батареи
+  sequence:
+  - target:
+      entity_id: switch.sonoff_ab300012ee_1
+    action: switch.turn_off
+  mode: single
+battery_idle:
+  alias: Батарея в режиме ожидания
+  sequence:
+  - target:
+      entity_id: switch.sonoff_ab300012ee_1
+    action: switch.turn_off
+  mode: single
