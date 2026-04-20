@@ -760,3 +760,21 @@
       entity_id: counter.water_pump_switch_counter
     action: counter.reset
   mode: single
+- id: frigate_person_detected_telegram
+  alias: 'Frigate: Person Detected Notification'
+  description: Send Telegram notification when person is detected
+  triggers:
+  - platform: event
+    event_type: frigate_event
+    event_data:
+      type: new
+      label: person
+  actions:
+  - service: notify.telegram_bot
+    data:
+      message: '🚨 Person detected: {{ trigger.event.data.camera }} at {{ now().strftime("%H:%M:%S") }}'
+      data:
+        photo:
+        - url: 'http://192.168.192.4:8123/api/frigate/notifications/{{ trigger.event.data.id }}/thumbnail.jpg'
+          caption: 'Person detected on {{ trigger.event.data.camera }}'
+  mode: single

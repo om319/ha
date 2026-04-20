@@ -19,3 +19,13 @@ battery_idle:
       entity_id: switch.sonoff_ab300012ee_1
     action: switch.turn_off
   mode: single
+test_frigate_person_detection:
+  alias: Test Frigate Person Detection
+  sequence:
+  - event: frigate_event
+    event_data:
+      type: new
+      label: person
+      camera: test_camera
+      id: test_{{ now().timestamp() | int }}
+  mode: single
