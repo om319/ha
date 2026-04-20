@@ -234,9 +234,10 @@ cards:
         label: |
           [[[
             var current = parseFloat(states['sensor.sonoff_ab300012ee_current_4'].state);
+            var power = parseFloat(states['sensor.sonoff_ab300012ee_power_4'].state);
             var status = current > 0.1 ? 'ON' : 'OFF';
             var switches = states['counter.water_pump_switch_counter'].state;
-            return `<div style="font-size: 10px; color: black;"><b>${status}</b></div><div style="font-size: 9px; margin-top: 4px; color: black;">Switches: ${switches}</div>`;
+            return `<div style="font-size: 10px; color: black;"><b>${status}</b> - ${power}W</div><div style="font-size: 9px; margin-top: 4px; color: black;">Switches: ${switches}</div>`;
           ]]]
         styles:
           card:
@@ -267,6 +268,51 @@ cards:
                       var current = parseFloat(states['sensor.sonoff_ab300012ee_current_4'].state);
                       return current > 0.1 ? '#b3d9ff' : 'white';
                     ]]]
+          - value: "off"
+            styles:
+              card:
+                - background-color: white
+      - type: custom:button-card
+        entity: switch.sonoff_ab300012ee_3
+        name: Солн. насос
+        icon: mdi:pump
+        show_label: true
+        confirmation:
+          text: |
+            [[[
+              var state = states['switch.sonoff_ab300012ee_3'].state;
+              return state === 'on' ? 'Выключить насос солнечного коллектора?' : 'Включить насос солнечного коллектора?';
+            ]]]
+        label: |
+          [[[
+            var state = states['switch.sonoff_ab300012ee_3'].state;
+            var power = parseFloat(states['sensor.sonoff_ab300012ee_power_3'].state);
+            var status = state === 'on' ? 'ON' : 'OFF';
+            return `<div style="font-size: 10px; color: black;"><b>${status}</b></div><div style="font-size: 9px; margin-top: 4px; color: black;">Power: ${power}W</div>`;
+          ]]]
+        styles:
+          card:
+            - height: 100px
+            - border-radius: 12px
+            - border: 1px solid
+            - padding: 8px 10px 8px 10px
+          name:
+            - font-size: 11px
+            - font-weight: bold
+            - color: black
+          label:
+            - font-size: 10px
+            - color: black
+          icon:
+            - width: 28px
+            - color: black
+        state:
+          - value: "on"
+            styles:
+              card:
+                - background-color: '#ffe0b2'
+              icon:
+                - color: '#ff6f00'
           - value: "off"
             styles:
               card:

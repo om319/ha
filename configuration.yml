@@ -43,6 +43,31 @@ sensor:
     scan_interval: 300              # seconds between updates (default: 300 = 5 min)
     timeout: 15                     # BLE connection timeout in seconds (default: 15)
 
+  # ===== ENERGY MONITORING - RIEMANN SUM INTEGRATIONS =====
+  - platform: integration
+    source: sensor.home_total_consumption_power
+    name: "Home Total Consumption Energy"
+    unique_id: home_total_consumption_energy
+    unit_prefix: k
+    round: 2
+    method: left
+
+  - platform: integration
+    source: sensor.solar_curtailment_power
+    name: "Solar Curtailment Energy"
+    unique_id: solar_curtailment_energy
+    unit_prefix: k
+    round: 2
+    method: left
+
+  - platform: integration
+    source: sensor.sonoff_ab300012ee_power_1
+    name: "Grid Charge Energy"
+    unique_id: grid_charge_energy
+    unit_prefix: k
+    round: 2
+    method: left
+
 button:
   - platform: pq_mppt
     mac: "c8:47:80:07:e9:4a"       # ← must match the MAC in sensor above
@@ -247,6 +272,35 @@ template:
             mdi:water-pump
           {% else %}
             mdi:water-pump-off
+          {% endif %}
+
+      # ===== ENERGY MONITORING =====
+      - name: "Home Total Consumption Power"
+        unique_id: home_total_consumption_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set house = states('sensor.sonoff_ab300012ee_power_2') | float(0) %}
+          {% set solar_pump = states('sensor.sonoff_ab300012ee_power_3') | float(0) %}
+          {% set well_pump = states('sensor.sonoff_ab300012ee_power_4') | float(0) %}
+          {% set mppt_load = states('sensor.mppt_solar_controller_load_power') | float(0) %}
+          {{ (house + solar_pump + well_pump + mppt_load) | round(1) }}
+
+      - name: "Solar Curtailment Power"
+        unique_id: solar_curtailment_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set status = states('sensor.mppt_solar_controller_charging_status') %}
+          {% set current = states('sensor.mppt_solar_controller_charging_current') | float(0) %}
+          {% set power = states('sensor.mppt_solar_controller_charging_power') | float(0) %}
+          {% set soc = states('sensor.p_24100bnn160_b00176_battery') | float(0) %}
+          {% if status == 'Standby' and current > 0.1 and power > 5 and soc >= 99 %}
+            {{ power | round(1) }}
+          {% else %}
+            0
           {% endif %}
 
       # ===== NORDPOOL PRICES TIMELINE LV =====
