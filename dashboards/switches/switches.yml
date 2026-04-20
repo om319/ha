@@ -226,6 +226,51 @@ cards:
           icon:
             - width: 28px
             - color: black
+      - type: custom:button-card
+        entity: select.sonoff_ab300012ee_4
+        name: Насос
+        icon: mdi:water-pump
+        show_label: true
+        label: |
+          [[[
+            var current = parseFloat(states['sensor.sonoff_ab300012ee_current_4'].state);
+            var status = current > 0.1 ? 'ON' : 'OFF';
+            var switches = states['counter.water_pump_switch_counter'].state;
+            return `<div style="font-size: 10px; color: black;"><b>${status}</b></div><div style="font-size: 9px; margin-top: 4px; color: black;">Switches: ${switches}</div>`;
+          ]]]
+        styles:
+          card:
+            - height: 100px
+            - border-radius: 12px
+            - border: 1px solid
+            - padding: 8px 10px 8px 10px
+          name:
+            - font-size: 11px
+            - font-weight: bold
+            - color: black
+          label:
+            - font-size: 10px
+            - color: black
+          icon:
+            - width: 28px
+            - color: |
+                [[[
+                  var current = parseFloat(states['sensor.sonoff_ab300012ee_current_4'].state);
+                  return current > 0.1 ? 'blue' : 'black';
+                ]]]
+        state:
+          - value: "on"
+            styles:
+              card:
+                - background-color: |
+                    [[[
+                      var current = parseFloat(states['sensor.sonoff_ab300012ee_current_4'].state);
+                      return current > 0.1 ? '#b3d9ff' : 'white';
+                    ]]]
+          - value: "off"
+            styles:
+              card:
+                - background-color: white
   - type: grid
     columns: 4
     square: false

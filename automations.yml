@@ -737,3 +737,26 @@
         default: []
     default: []
   id: cheapest_energy_windows_notifications
+- id: water_pump_switch_counter
+  alias: 'Water Pump: Count Switches'
+  description: Count water pump on/off switches
+  triggers:
+  - entity_id: sensor.water_pump_status
+    trigger: state
+    to: 'on'
+  actions:
+  - target:
+      entity_id: counter.water_pump_switch_counter
+    action: counter.increment
+  mode: single
+- id: water_pump_counter_reset
+  alias: 'Water Pump: Reset Daily Counter'
+  description: Reset water pump counter at midnight
+  triggers:
+  - at: 00:00:00
+    trigger: time
+  actions:
+  - target:
+      entity_id: counter.water_pump_switch_counter
+    action: counter.reset
+  mode: single

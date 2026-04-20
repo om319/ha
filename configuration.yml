@@ -232,6 +232,23 @@ template:
         device_class: energy_storage
         state_class: measurement
 
+      # ===== WATER PUMP STATUS =====
+      - name: "Water Pump Status"
+        state: >
+          {% set current = states('sensor.sonoff_ab300012ee_current_4') | float(0) %}
+          {% if current > 0.1 %}
+            on
+          {% else %}
+            off
+          {% endif %}
+        icon: >
+          {% set current = states('sensor.sonoff_ab300012ee_current_4') | float(0) %}
+          {% if current > 0.1 %}
+            mdi:water-pump
+          {% else %}
+            mdi:water-pump-off
+          {% endif %}
+
       # ===== NORDPOOL PRICES TIMELINE LV =====
       - name: "Nordpool Prices Timeline LV"
         state: "{{ now().isoformat() }}"
@@ -266,3 +283,8 @@ counter:
     name: "Pump ON Counter"
     icon: mdi:counter
     restore: true
+
+  water_pump_switch_counter:
+    name: "Water Pump Switch Counter"
+    icon: mdi:counter
+    restore: false
