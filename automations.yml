@@ -770,7 +770,7 @@
       type: new
       label: person
   actions:
-  - service: notify.telegram_bot
+  - service: notify.sarai_oleg_matveev_1434630975
     data:
       message: '🚨 Person detected: {{ trigger.event.data.camera }} at {{ now().strftime("%H:%M:%S") }}'
       data:

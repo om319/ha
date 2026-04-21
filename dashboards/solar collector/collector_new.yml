@@ -122,12 +122,7 @@ cards:
           action: more-info
 
       - type: custom:button-card
-        entity: |
-          [[[
-            return states['input_boolean.solar_collector_summer_mode'].state === 'on'
-              ? 'sensor.solar_collector_wifi_boiler_temperature'
-              : 'sensor.sonoff_10021e4b3c_temperature';
-          ]]]
+        entity: input_boolean.solar_collector_summer_mode
         name: |
           [[[
             return states['input_boolean.solar_collector_summer_mode'].state === 'on'
@@ -137,6 +132,14 @@ cards:
         show_state: true
         show_label: true
         icon: mdi:water-boiler
+        state_display: |
+          [[[
+            var isSummer = states['input_boolean.solar_collector_summer_mode'].state === 'on';
+            var temp = parseFloat(isSummer
+              ? states['sensor.solar_collector_wifi_boiler_temperature'].state
+              : states['sensor.sonoff_10021e4b3c_temperature'].state);
+            return temp.toFixed(1) + '°C';
+          ]]]
         label: |
           [[[
             var max = parseFloat(states['input_number.solar_max_boiler_temp'].state);
@@ -173,7 +176,7 @@ cards:
             - color: white
             - width: 35px
         tap_action:
-          action: more-info
+          action: none
 
       - type: custom:button-card
         entity: sensor.solar_collector_delta_temperature
